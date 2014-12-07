@@ -21,7 +21,7 @@
   (:use :cl :lw :lexer :parsergen)
   (:export
    #:parse-csv
-   #:decode-csv))
+   #:format-csv))
 
 (in-package :csv)
 
@@ -33,7 +33,7 @@
   ("\""                 (push-lexer 'string-lexer :string))
 
   ;; anything else is the cell
-  (".[^%n,]*"           (values :cell (string-trim '(#\space #\tab) $$))))
+  (".[^%n,]*"           (values :cell $$)))
 
 (deflexer string-lexer
   ("\"\""               (values :chars "\""))
@@ -69,3 +69,14 @@
   "Convert a CSV string into a Lisp object."
   (parse #'csv-parser (tokenize #'csv-lexer string source)))
 
+(defun format-csv (record &optional stream)
+  "Convert a list of Lisp objects into a list a CSV string."
+  (format stream "~{~/csv::format-cell/~^,~}" record))
+
+(defun format-cell (stream cell &optional colonp atp &rest args)
+  "Format a CSV record cell to a stream."
+  (declare (ignore colonp atp args))
+  (let ((s (princ-to-string cell)))
+    (if (find #\, s)
+        (format stream "\"~{~a~^\"\"~}\"" (split-sequence '(#\") s))
+      (princ s stream))))
