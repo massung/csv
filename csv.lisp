@@ -25,24 +25,30 @@
 
 (in-package :csv)
 
-(deflexer csv-lexer
+;;; ----------------------------------------------------
+
+(deflexer csv-lexer (s)
   ("%n+"                (values :end))
   (","                  (values :comma))
 
   ;; double quotes around a cell
-  ("\""                 (push-lexer 'string-lexer :string))
+  ("\""                 (push-lexer s 'string-lexer :string))
 
   ;; anything else is the cell
   (".[^%n,]*"           (values :cell $$)))
 
-(deflexer string-lexer
+;;; ----------------------------------------------------
+
+(deflexer string-lexer (s)
   ("\"\""               (values :chars "\""))
 
   ;; end of the string?
-  ("\""                 (pop-lexer :string))
+  ("\""                 (pop-lexer s :string))
 
   ;; anything else
   (".[^\"]*"            (values :chars $$)))
+
+;;; ----------------------------------------------------
 
 (defparser csv-parser
   ((csv records) $1)
@@ -65,13 +71,19 @@
   ((string :chars string) (string-append $1 $2))
   ((string :string) ""))
 
+;;; ----------------------------------------------------
+
 (defun parse-csv (string &optional source)
   "Convert a CSV string into a Lisp object."
-  (parse #'csv-parser (tokenize #'csv-lexer string source)))
+  (parse #'csv-parser #'csv-lexer string source))
+
+;;; ----------------------------------------------------
 
 (defun format-csv (record &optional stream)
   "Convert a list of Lisp objects into a list a CSV string."
   (format stream "~{~/csv::format-cell/~^,~}" record))
+
+;;; ----------------------------------------------------
 
 (defun format-cell (stream cell &optional colonp atp &rest args)
   "Format a CSV record cell to a stream."
