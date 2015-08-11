@@ -1,6 +1,6 @@
-;;;; CSV Parsing for LispWorks
+;;;; CSV Parsing for Common Lisp
 ;;;;
-;;;; Copyright (c) 2014 by Jeffrey Massung
+;;;; Copyright (c) Jeffrey Massung
 ;;;;
 ;;;; This file is provided to you under the Apache License,
 ;;;; Version 2.0 (the "License"); you may not use this file
@@ -18,68 +18,68 @@
 ;;;;
 
 (defpackage :csv
-  (:use :cl :lw :lexer :parsergen)
+  (:use :cl :lexer :parse)
   (:export
-   #:parse-csv
-   #:format-csv))
+   #:csv-parse
+   #:csv-format))
 
 (in-package :csv)
 
 ;;; ----------------------------------------------------
 
 (deflexer csv-lexer (s)
-  ("%n+"                (values :end))
-  (","                  (values :comma))
+  ("%n+"      (values :end))
+  (","        (values :comma))
 
   ;; double quotes around a cell
-  ("\""                 (push-lexer s 'string-lexer :string))
+  ("\""       (push-lexer s 'string-lexer :quote))
 
   ;; anything else is the cell
-  (".[^%n,]*"           (values :cell $$)))
+  (".[^%n,]*" (values :cell $$)))
 
 ;;; ----------------------------------------------------
 
 (deflexer string-lexer (s)
-  ("\"\""               (values :chars "\""))
+  ("\"\""     (values :chars "\""))
 
   ;; end of the string?
-  ("\""                 (pop-lexer s :string))
+  ("\""       (pop-lexer s :quote))
 
   ;; anything else
-  (".[^\"]*"            (values :chars $$)))
+  (".[^\"]*"  (values :chars $$)))
 
 ;;; ----------------------------------------------------
 
 (defparser csv-parser
-  ((csv records) $1)
-
-  ;; a list of records
-  ((records record records) `(,$1 ,@$2))
-  ((records))
-
-  ;; a record is comma-separated cells
-  ((record cell :comma record) `(,$1 ,@$3))
-  ((record cell :end) `(,$1))
-  ((record cell) `(,$1))
-
-  ;; a cell is a quoted string or a set of characters
-  ((cell :cell) $1)
-  ((cell :string string) $2)
-  ((cell :error) "")
-
-  ;; a quoted cell value
-  ((string :chars string) (string-append $1 $2))
-  ((string :string) ""))
+  (.sep-by1 'csv-record (.is :end)))
 
 ;;; ----------------------------------------------------
 
-(defun parse-csv (string &optional source)
+(defparser csv-record
+  (.sep-by1 'csv-cell (.is :comma)))
+
+;;; ----------------------------------------------------
+
+(defparser csv-cell
+  (.one-of (.is :cell) 'csv-string))
+
+;;; ----------------------------------------------------
+
+(defparser csv-string
+  (.let (cs (>> (.is :quote) (.many-until (.is :chars) (.is :quote))))
+    (format nil "~{~a~}" cs)))
+
+;;; ----------------------------------------------------
+
+(defun csv-parse (string &optional source)
   "Convert a CSV string into a Lisp object."
-  (parse #'csv-parser #'csv-lexer string source))
+  (with-lexer (lexer 'csv-lexer string :source source)
+    (with-token-reader (next-token lexer)
+      (parse 'csv-parser next-token))))
 
 ;;; ----------------------------------------------------
 
-(defun format-csv (record &optional stream)
+(defun csv-format (record &optional stream)
   "Convert a list of Lisp objects into a list a CSV string."
   (format stream "~{~/csv::format-cell/~^,~}" record))
 
@@ -90,5 +90,18 @@
   (declare (ignore colonp atp args))
   (let ((s (princ-to-string cell)))
     (if (find #\, s)
-        (format stream "\"~{~a~^\"\"~}\"" (split-sequence '(#\") s))
+        (progn
+          (write-char #\" stream)
+
+          ;; output all the cell characters to the stream
+          (loop
+             for c across s
+
+             ;; write this portion of the cell
+             do (if (char= c #\")
+                    (write-string "\"\"" stream)
+                  (princ c stream))
+
+             ;; close the string
+             finally (write-char #\" stream)))
       (princ s stream))))
