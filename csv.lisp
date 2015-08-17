@@ -67,7 +67,7 @@
 
 (defparser csv-string
   (.let (cs (>> (.is :quote) (.many-until (.is :chars) (.is :quote))))
-    (format nil "~{~a~}" cs)))
+    (.ret (format nil "~{~a~}" cs))))
 
 ;;; ----------------------------------------------------
 
