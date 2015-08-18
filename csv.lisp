@@ -27,7 +27,7 @@
 
 ;;; ----------------------------------------------------
 
-(deflexer csv-lexer (s)
+(define-lexer csv-lexer (s)
   ("%n+"      (values :end))
   (","        (values :comma))
 
@@ -39,7 +39,7 @@
 
 ;;; ----------------------------------------------------
 
-(deflexer string-lexer (s)
+(define-lexer string-lexer (s)
   ("\"\""     (values :chars "\""))
 
   ;; end of the string?
@@ -50,22 +50,22 @@
 
 ;;; ----------------------------------------------------
 
-(defparser csv-parser
+(define-parser csv-parser
   (.sep-by1 'csv-record (.is :end)))
 
 ;;; ----------------------------------------------------
 
-(defparser csv-record
+(define-parser csv-record
   (.sep-by1 'csv-cell (.is :comma)))
 
 ;;; ----------------------------------------------------
 
-(defparser csv-cell
+(define-parser csv-cell
   (.one-of 'csv-string (.is :cell) (.ret "")))
 
 ;;; ----------------------------------------------------
 
-(defparser csv-string
+(define-parser csv-string
   (.let (cs (>> (.is :quote) (.many-until (.is :chars) (.is :quote))))
     (.ret (format nil "~{~a~}" cs))))
 
