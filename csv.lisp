@@ -61,12 +61,12 @@
 ;;; ----------------------------------------------------
 
 (define-parser csv-cell
-  (.one-of 'csv-string (.is :cell) (.ret "")))
+  (.or 'csv-string (.is :cell) (.ret "")))
 
 ;;; ----------------------------------------------------
 
 (define-parser csv-string
-  (.let (cs (>> (.is :quote) (.many-until (.is :chars) (.is :quote))))
+  (.let (cs (.do (.is :quote) (.many-until (.is :chars) (.is :quote))))
     (.ret (format nil "~{~a~}" cs))))
 
 ;;; ----------------------------------------------------
