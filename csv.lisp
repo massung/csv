@@ -61,13 +61,19 @@
 ;;; ----------------------------------------------------
 
 (define-parser csv-cell
-  (.or 'csv-string (.is :cell) (.ret "")))
+  (.or 'csv-string 'csv-malformed-string (.is :cell) (.ret "")))
 
 ;;; ----------------------------------------------------
 
 (define-parser csv-string
-  (.let (cs (.do (.is :quote) (.many-until (.is :chars) (.is :quote))))
+  (.let (cs (.between (.is :quote) (.is :quote) (.many (.is :chars))))
     (.ret (format nil "~{~a~}" cs))))
+
+;;; ----------------------------------------------------
+
+(define-parser csv-malformed-string
+  (.let (cs (.do (.is :quote) (.many (.is :chars))))
+    (.ret (format nil "\"~{~a~}" cs))))
 
 ;;; ----------------------------------------------------
 
