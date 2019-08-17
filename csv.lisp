@@ -18,96 +18,140 @@
 ;;;;
 
 (defpackage :csv
-  (:use :cl :lexer :parse)
+  (:use :cl :re)
   (:export
-   #:csv-parse
-   #:csv-format))
+   #:make-csv-format
+
+   ;; csv formatting
+   #:csv-format-comment
+   #:csv-format-separator
+   #:csv-format-quote
+   #:csv-format-escape
+
+   ;; special variables
+   #:*csv-format*
+
+   ;; reading functions
+   #:read-csv
+   #:read-record
+
+   ;; writing functions
+   #:write-csv
+   #:write-record))
 
 (in-package :csv)
 
 ;;; ----------------------------------------------------
 
-(define-lexer csv-lexer (s)
-  ("%n+"      (values :end))
-  (","        (values :comma))
-
-  ;; double quotes around a cell
-  ("\""       (push-lexer s 'string-lexer :quote))
-
-  ;; anything else is the cell
-  (".[^%n,]*" (values :cell $$)))
+(defstruct csv-format
+  "Description of a CSV format used for reading/writing."
+  (comment #\#)
+  (separator #\,)
+  (quote #\")
+  (escape #\\))
 
 ;;; ----------------------------------------------------
 
-(define-lexer string-lexer (s)
-  ("\"\""     (values :chars "\""))
-
-  ;; end of the string?
-  ("\""       (pop-lexer s :quote))
-
-  ;; anything else
-  (".[^\"]*"  (values :chars $$)))
+(defparameter *csv-format* (make-csv-format)
+  "Default CSV format.")
 
 ;;; ----------------------------------------------------
 
-(define-parser csv-parser
-  (.sep-by1 'csv-record (.is :end)))
+(defun read-csv (stream &optional (format *csv-format*))
+  "Collect all rows from a stream into a list."
+  (loop for row = (read-record stream format) while row collect row))
 
 ;;; ----------------------------------------------------
 
-(define-parser csv-record
-  (.sep-by1 'csv-cell (.is :comma)))
+(defun read-record (stream &optional (format *csv-format*))
+  "Read the next row of cells into a vector."
+  (loop
+     with row = (list nil)
+     with tail = row
+
+     ;; test for end of file
+     for c = (peek-char nil stream nil)
+     until (null c)
+
+     ;; skip comments
+     do (if (equal c (csv-format-comment format))
+            (read-line stream)
+          (loop (multiple-value-bind (cell eol)
+                    (read-cell stream format)
+                  (setf tail (cdr (rplacd tail (list cell))))
+                  (when eol
+                    (return-from read-record (cdr row))))))))
 
 ;;; ----------------------------------------------------
 
-(define-parser csv-cell
-  (.or 'csv-string 'csv-malformed-string (.is :cell) (.ret "")))
+(defun read-cell (stream format)
+  "Read a cell from the current record."
+  (with-slots (separator quote escape)
+      format
+    (loop
+       with cell = (make-string-output-stream)
+
+       ;; get the next character
+       for char = (read-char stream nil)
+       for endp = (or (equal char nil)
+                      (equal char #\return)
+                      (equal char #\linefeed))
+
+       ;; stop cell parsing at delimiter or end of line
+       when (or (equal char separator) endp)
+       return (values (get-output-stream-string cell) endp)
+
+       ;; write character to row cell
+       do (if (equal char quote)
+              (do ((c (read-char stream)
+                      (read-char stream)))
+                  ((equal c quote))
+                (if (equal c escape)
+                    (write-char (read-char stream) cell)
+                  (write-char c cell)))
+            (write-char char cell)))))
 
 ;;; ----------------------------------------------------
 
-(define-parser csv-string
-  (.let (cs (.between (.is :quote) (.is :quote) (.many (.is :chars))))
-    (.ret (format nil "~{~a~}" cs))))
+(defun write-csv (rows stream &optional (format *csv-format*))
+  "Write CSV records to a stream using the provided format."
+  (map nil #'(lambda (row) (write-record row stream format)) rows))
 
 ;;; ----------------------------------------------------
 
-(define-parser csv-malformed-string
-  (.let (cs (.do (.is :quote) (.many (.is :chars))))
-    (.ret (format nil "\"~{~a~}" cs))))
+(defun write-record (record stream &optional (format *csv-format*))
+  "Write a single CSV record to a stream using the given format."
+  (let ((*csv-format* format))
+    (do ((cell (pop record)
+               (pop record)))
+        ((null cell))
+      (write-cell cell stream format)
+
+      ;; delimiter or newline
+      (if (null record)
+          (terpri stream)
+        (write-char (csv-format-separator format) stream)))))
 
 ;;; ----------------------------------------------------
 
-(defun csv-parse (string &optional source)
-  "Convert a CSV string into a Lisp object."
-  (with-lexer (lexer 'csv-lexer string :source source)
-    (with-token-reader (next-token lexer)
-      (parse 'csv-parser next-token))))
-
-;;; ----------------------------------------------------
-
-(defun csv-format (record &optional stream)
-  "Convert a list of Lisp objects into a list a CSV string."
-  (format stream "~{~/csv::format-cell/~^,~}" record))
-
-;;; ----------------------------------------------------
-
-(defun format-cell (stream cell &optional colonp atp &rest args)
+(defun write-cell (cell stream format)
   "Format a CSV record cell to a stream."
-  (declare (ignore colonp atp args))
-  (let ((s (princ-to-string cell)))
-    (if (find #\, s)
-        (progn
-          (write-char #\" stream)
+  (with-slots (separator quote escape)
+      format
+    (let ((s (princ-to-string cell)))
+      (if (find separator s :test #'equal)
+          (progn
+            (write-char quote stream)
 
-          ;; output all the cell characters to the stream
-          (loop
-             for c across s
+            ;; output all the cell characters to the stream
+            (loop
+               for c across s
 
-             ;; write this portion of the cell
-             do (if (char= c #\")
-                    (write-string "\"\"" stream)
-                  (princ c stream))
+               ;; write this portion of the cell
+               do (if (equal c quote)
+                      (format stream "~c~c" escape quote)
+                    (princ c stream))
 
-             ;; close the string
-             finally (write-char #\" stream)))
-      (princ s stream))))
+               ;; close the string
+               finally (write-char quote stream)))
+        (princ s stream)))))

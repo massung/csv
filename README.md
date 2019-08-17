@@ -1,25 +1,39 @@
 # CSV Parser for Common Lisp
 
-The `csv` package is a dead-simple [Comma Separated Values](http://www.json.org) parser for Common Lisp. It adhears to the [RFC 4180](https://tools.ietf.org/html/rfc4180) spec.
+The `csv` package is a dead-simple [Comma Separated Values](http://www.json.org) parser for Common Lisp. It is fast, customizable, and works on streams.
 
 ## Quickstart
 
-Parsing a CSV is simply a matter of calling `parse-csv`.
+Since there are so many versions of the CSV file, the first thing to do is define the `csv-format` you'd like to use with `make-csv-format`:
 
-    (parse-csv string &optional source) ;=> list
+    CL-USER > (make-csv-format :separator #\tab)
+    #S(CSV::CSV-FORMAT :COMMENT #\# :SEPARATOR #\Tab :QUOTE #\" :ESCAPE #\\)
 
-It is always assumes that the CSV is multi-line, so the result is a list of lists, where each inner list is a record of cells.
+Now, it's possible to use that format with one of the read/write CSV functions available.
 
-    CL-USER > (parse-csv "1,2,3")
-    (("1" "2" "3"))
+Read functions:
 
-Generating a CSV string from Lisp is done with the `format-csv` function.
+    (read-csv stream &optional format)
+    (read-record stream &optional format)
 
-    (format-csv record &optional stream) ;=> string
+Write functions:
 
-The *record* parameter should be a list of cells and not a list of records.
+    (write-csv records stream &optional format)
+    (write-record record stream &optional format)
 
-    CL-USER > (format-csv '(1 "Hello, world" 2))
-    "1,\"Hello, world\",2"
+There is a global, dynamic format `*csv-format*` that is used if a format is not provided (which can obviously be overridden lexically).
+
+## Example Usage
+
+Parsing a single record:
+
+    CL-USER > (with-input-from-string (s "1,2,\"Hello, world!\",NA")
+                (read-record s))
+    ("1" "2" "Hello, world!" "NA")
+
+Writing a single record:
+
+    CL-USER > (write-record * *standard-output*)
+    1,2,"Hello, world!",NA
 
 That's it!
