@@ -18,7 +18,7 @@
 ;;;;
 
 (defpackage :csv
-  (:use :cl :re)
+  (:use :cl)
   (:export
    #:make-csv-format
 
@@ -54,6 +54,10 @@
 
 (defparameter *csv-format* (make-csv-format)
   "Default CSV format.")
+
+;;; ----------------------------------------------------
+
+
 
 ;;; ----------------------------------------------------
 
