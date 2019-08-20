@@ -57,10 +57,6 @@
 
 ;;; ----------------------------------------------------
 
-
-
-;;; ----------------------------------------------------
-
 (defun read-csv (stream &optional (format *csv-format*))
   "Collect all rows from a stream into a list."
   (loop for row = (read-record stream format) while row collect row))
