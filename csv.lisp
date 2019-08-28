@@ -65,6 +65,7 @@
 
 (defun read-record (stream &optional (format *csv-format*))
   "Read the next row of cells into a vector."
+  (declare (optimize (speed 3) (debug 0)))
   (loop
      with row = (list nil)
      with tail = row
@@ -86,6 +87,7 @@
 
 (defun read-cell (stream format)
   "Read a cell from the current record."
+  (declare (optimize (speed 3) (debug 0)))
   (with-slots (separator quote escape)
       format
     (loop
