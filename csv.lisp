@@ -45,8 +45,8 @@
 
 (defstruct csv-format
   "Description of a CSV format used for reading/writing."
+  (separator "," :type sequence)
   (comment #\#)
-  (separator #\,)
   (quote #\")
   (escape #\\))
 
@@ -100,7 +100,7 @@
                       (equal char #\linefeed))
 
        ;; stop cell parsing at delimiter or end of line
-       when (or (equal char separator) endp)
+       when (or (member char separator) endp)
        return (values (get-output-stream-string cell) endp)
 
        ;; write character to row cell
@@ -123,7 +123,7 @@
 
 (defun write-record (record stream &optional (format *csv-format*))
   "Write a single CSV record to a stream using the given format."
-  (let ((*csv-format* format))
+  (let ((sep (elt (csv-format-separator format) 0)))
     (do ((cell (pop record)
                (pop record)))
         ((null cell))
@@ -132,7 +132,7 @@
       ;; delimiter or newline
       (if (null record)
           (terpri stream)
-        (write-char (csv-format-separator format) stream)))))
+        (write-char sep stream)))))
 
 ;;; ----------------------------------------------------
 
@@ -141,7 +141,7 @@
   (with-slots (separator quote escape)
       format
     (let ((s (princ-to-string cell)))
-      (if (find separator s :test #'equal)
+      (if (member s separator)
           (progn
             (write-char quote stream)
 

@@ -1,13 +1,13 @@
 # CSV Parser for Common Lisp
 
-The `csv` package is a dead-simple [Comma Separated Values](http://www.json.org) parser for Common Lisp. It is fast, customizable, and works on streams.
+The `csv` package is a dead-simple [Comma Separated Values](https://en.wikipedia.org/wiki/Comma-separated_values) parser for Common Lisp. It is fast, customizable, and works on streams.
 
 ## Quickstart
 
 Since there are so many versions of the CSV file, the first thing to do is define the `csv-format` you'd like to use with `make-csv-format`:
 
-    CL-USER > (make-csv-format :separator #\tab)
-    #S(CSV::CSV-FORMAT :COMMENT #\# :SEPARATOR #\Tab :QUOTE #\" :ESCAPE #\\)
+    CL-USER > (make-csv-format :separator '(#\tab))
+    #S(CSV::CSV-FORMAT :COMMENT #\# :SEPARATOR (#\Tab) :QUOTE #\" :ESCAPE #\\)
 
 Now, it's possible to use that format with one of the read/write CSV functions available.
 
