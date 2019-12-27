@@ -46,6 +46,7 @@
 (defstruct csv-format
   "Description of a CSV format used for reading/writing."
   (separator "," :type sequence)
+  (nil-values '("" "na"))
   (comment #\#)
   (quote #\")
   (escape #\\))
@@ -88,7 +89,7 @@
 (defun read-cell (stream format)
   "Read a cell from the current record."
   (declare (optimize (speed 3) (debug 0)))
-  (with-slots (separator quote escape)
+  (with-slots (separator quote escape nil-values)
       format
     (loop
        with cell = (make-string-output-stream)
@@ -100,8 +101,9 @@
                       (equal char #\linefeed))
 
        ;; stop cell parsing at delimiter or end of line
-       when (or (member char separator) endp)
-       return (values (get-output-stream-string cell) endp)
+       when (or (find char separator) endp)
+       return (let ((s (get-output-stream-string cell)))
+                (values (if (find s nil-values) nil s) endp))
 
        ;; write character to row cell
        do (if (equal char quote)
